@@ -40,7 +40,7 @@ Good! You can create a .txt file and paste all that inside it. Now, that you hav
 
 You can use this little program. First of all, you need to clone the repo, create a virtualenv and install the requirements:
 ```bash
-git clone 
+git clone https://github.com/jaimebw/song_extractor.git
 virtualenv venv
 source venv/bin/activate
 pip -r requirements.txt
