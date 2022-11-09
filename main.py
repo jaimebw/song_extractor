@@ -5,14 +5,41 @@ from pathlib import Path
 from pydub import AudioSegment
 import re
 from tqdm import tqdm
+import argparse
 
+def number_first_index(string:str)->int:
+    """
+    Returns the index of the first number in a string
+    
+    Parameters
+    ----------
+    string : str
 
-def number_first_index(string):
+    Returns
+    -------
+    int
+        index of the first number in the string
+
+    """
+
     return re.search(r"\d", string).start()
 
-# delete last char of string
 
-def parse_songs(path):
+def parse_songs(path:Path)->list:
+    """
+    Parse the text file containing the songs and timestamps
+
+    Parameters
+    ----------
+    path : Path
+        Path to the text file
+
+    Returns
+    -------
+    list
+        List of dictionaries containing the songs names and timestamps
+
+    """
     with open(path, "r") as f:
         songs = f.readlines()
     song_info = []
@@ -23,6 +50,7 @@ def parse_songs(path):
         song_name = song_name.replace("\n", "")
         song_timestamp = song[index_number:]
         song_timestamp = song_timestamp.replace("\n", "")
+
         song_dict = {
             "name": song_name,
             "timestamp": song_timestamp
@@ -30,27 +58,47 @@ def parse_songs(path):
         song_info.append(song_dict)
     return song_info
 
-def time_to_seconds(string):
+def time_to_seconds(string:str)->int:
+    """
+    Converts a string in the format "mm:ss" to seconds
+
+    Parameters
+    ----------
+    string : str
+        String in the format "mm:ss"
+
+    Returns
+    -------
+    int
+        Number of seconds
+
+    """
     time = string.split(":")
     seconds = int(time[0]) * 60 + int(time[1])
     return seconds
 
-if __name__ == "__main__":
-    path_to_audio = Path("Joji - Chloe Burbank Vol. 1 (23 Track Album)-qOm-trHYlh8.m4a")
-    path_to_cover = Path("cover.png")
-    meta_dict = {
-        "album" : "Chloe Burbank Vol. 1",
-        "artist":"Joji"}
-
-    song_path = Path("processed_songs")
-
-    if not song_path.exists():
-        song_path.mkdir()
+def main(audio_path:Path,song_path:Path,cover_path:Path = None,album_name:str = None,artist_name:str = None)->None:
+    """
+    """
+    if not audio_path or not song_path:
+        raise ValueError("You must provide a path to the audio file and the song list")
     
-    path_to_song = Path("song_list.txt")
-    sound = AudioSegment.from_file(path_to_audio)
-    songs_info = parse_songs(path_to_song)
+    processed_song_path = Path("processed_songs")
+    
+    if not processed_song_path.exists(): 
+        processed_song_path.mkdir()
+    
+    if not album_name and not artist_name:
+        meta_dict = None
+    else:
+        meta_dict = {
+            "album" : album_name,
+            "artist":artist_name}
+    
+    sound = AudioSegment.from_file(audio_path)
+    songs_info = parse_songs(song_path)
     last_index = len(songs_info) - 1
+
     for index, song_info in enumerate(tqdm(songs_info)):
         tstamp0 = time_to_seconds(song_info["timestamp"])*1000
         if index != last_index:
@@ -58,9 +106,22 @@ if __name__ == "__main__":
             song_clip = sound[tstamp0:tstamp1]
         else:
             song_clip = sound[tstamp0:]
-        song_clip.export(song_path / f"{song_info['name']}.mp3", format="mp3",
-        tags = meta_dict,cover = str(path_to_cover)) 
-        
+        meta_dict["track"] = f"{index+1}/{len(songs_info)}"
+        song_clip.export(processed_song_path / f"{song_info['name']}.mp3", format="mp3",
+        tags = meta_dict,cover = str(cover_path))
+
+    
     
 
 
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--audio_path", help="Path to the audio file")
+    parser.add_argument("-s", "--song_path", help="Path to the text file containing the songs and timestamps")
+    parser.add_argument("-c", "--cover_path", help="Path to the cover image")
+    parser.add_argument("-n", "--album_name", help="Album name")
+    parser.add_argument("-r", "--artist_name", help="Artist name")
+    args = parser.parse_args()
+    main(Path(args.audio_path),Path(args.song_path),Path(args.cover_path),args.album_name,args.artist_name)
