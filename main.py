@@ -5,7 +5,39 @@ from pydub import AudioSegment
 import re
 from tqdm import tqdm
 import argparse
+import youtube_dl
 
+
+def download_song(url:str, output_path: Path)-> Path:
+    """
+    download a song from youtube
+
+    Parameters
+    ----------
+    url : str
+        url of the song
+    output_path : Path
+        path to the output file
+
+    Returns
+    -------
+    None
+    """
+    audio_path = Path(f'{str(output_path)}/song.mp3')
+    print(str(audio_path))
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': str(audio_path),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+    return audio_path 
 
 def number_first_index(string: str) -> int:
     """
@@ -83,24 +115,23 @@ def main(
     album_name: str = None,
     artist_name: str = None,
 ) -> None:
-    """ """
-    if not audio_path or not song_path:
-        raise ValueError("You must provide a path to the audio file and the song list")
-
+    """ 
+    Main function
+    """
     processed_song_path = Path("processed_songs")
 
     if not processed_song_path.exists():
         processed_song_path.mkdir()
 
     if not album_name and not artist_name:
-        meta_dict = None
+        meta_dict = dict()
     else:
         meta_dict = {"album": album_name, "artist": artist_name}
 
     sound = AudioSegment.from_file(audio_path)
     songs_info = parse_songs(song_path)
     last_index = len(songs_info) - 1
-
+    
     for index, song_info in enumerate(tqdm(songs_info)):
         tstamp0 = time_to_seconds(song_info["timestamp"]) * 1000
         if index != last_index:
@@ -113,13 +144,15 @@ def main(
             processed_song_path / f"{song_info['name']}.mp3",
             format="mp3",
             tags=meta_dict,
-            cover=str(cover_path),
+            cover=str(Path) if cover_path else None,
         )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+
+    parser = argparse.ArgumentParser()    
     parser.add_argument("-a", "--audio_path", help="Path to the audio file")
+    parser.add_argument("-u","--url", help="url of the song", type=str,default=None)
     parser.add_argument(
         "-s",
         "--song_path",
@@ -131,10 +164,21 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--album_name", help="Album name", default=None)
     parser.add_argument("-r", "--artist_name", help="Artist name", default=None)
     args = parser.parse_args()
+    
+    if args.url:
+        args.audio_path = download_song(args.url, Path())
+        print(args.audio_path)
+    
+    if (not args.url) and (not args.audio_path):
+        raise ValueError("You must provide a path to the audio file and or a youtube url")
+    
+    if not args.song_path:
+        raise ValueError("You must provide a path to the song list")
+    
     main(
-        Path(args.audio_path),
-        Path(args.song_path),
-        Path(args.cover_path),
+        args.audio_path,
+        args.song_path,
+        args.cover_path,
         args.album_name,
         args.artist_name,
     )
